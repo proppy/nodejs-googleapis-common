@@ -25,6 +25,7 @@ import * as extend from 'extend';
 import {APIRequestParams, BodyResponseCallback} from './api';
 import {isBrowser} from './isbrowser';
 import {SchemaParameters} from './schema';
+import {h2, MooRequestConfig} from './h2moo';
 
 // tslint:disable-next-line no-var-requires
 const pkg = require('../../package.json');
@@ -291,7 +292,16 @@ async function createAPIRequestAsync<T>(parameters: APIRequestParams) {
   // now void.  This may be a source of confusion for users upgrading from
   // version 24.0 -> 25.0 or up.
   if (authClient && typeof authClient === 'object') {
-    return (authClient as OAuth2Client).request<T>(mergedOptions);
+    if (mergedOptions.http2) {
+      const authHeaders = await authClient.getRequestHeaders(
+        mergedOptions.url
+      );
+      const mooOpts = Object.assign({}, mergedOptions) as MooRequestConfig;
+      mooOpts.headers = Object.assign(mooOpts.headers, authHeaders);
+      return h2.moo<T>(mooOpts);
+    } else {
+      return (authClient as OAuth2Client).request<T>(mergedOptions);
+    }
   } else {
     return new DefaultTransporter().request<T>(mergedOptions);
   }
